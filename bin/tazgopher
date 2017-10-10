@@ -1,0 +1,158 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use feature qw(say);
+use utf8;
+
+use lib qw(/home/devel/mdom/perl5/jessie/lib/perl5);
+use Mojo::IOLoop;
+use Mojo::UserAgent;
+use Mojo::ByteStream qw(b);
+use Text::Wrap qw();
+use Mojo::Util qw(trim);
+use IO::Handle;
+use Text::Unidecode qw();
+use Mojo::Loader qw(data_section);
+
+STDOUT->autoflush(1);
+
+my $ua   = Mojo::UserAgent->new;
+my $host = 'balin.edv.taz.de';
+my $port = 70;
+
+my %decode_chars = (
+	'Ä' => 'Ae',
+	'ä' => 'ae',
+	'Ö' => 'Oe',
+	'ö' => 'oe',
+	'Ü' => 'Ue',
+	'ü' => 'ue',
+	'ß' => 'ss',
+	'“' => '"',
+	'„' => '"',
+);
+
+sub fill {
+    my ( $text, $init, $subsequent ) = @_;
+    $init       ||= '';
+    $subsequent ||= '';
+    Text::Wrap::fill( $init, $subsequent, $text );
+}
+
+sub box {
+    my ( $text, $char ) = @_;
+    $text =~ s/^/"$char "/gesm;
+    return $text;
+}
+
+sub style_text {
+
+    my $id  = shift;
+    my $ua  = Mojo::UserAgent->new;
+    my $dom = $ua->get("http://taz.de/!$id/c.xml")->res->dom;
+
+    my $lead     = $dom->at('lead')->text;
+    my $headline = $dom->at('headline')->text;
+
+    my $corpus = $dom->at('corpus');
+    $corpus->find('b')->map( sub { $_->content( '*' . $_->content . '*' ) } );
+    $corpus->find('h6')
+      ->map( sub { $_->content( '# ' . $_->content . ' #' ) } );
+    $corpus->descendant_nodes->map('strip')
+      ->map( sub { $_->content( trim( $_->content ) ) } );
+
+    my $content = $corpus->content;
+    $content =~ s/&amp;/&/g;
+
+    say b( format_text($headline))->encode('latin1'), "\n";
+    say b( format_text($lead))->encode('latin1'), "\n";
+    say b( format_text($content))->encode('latin1');
+}
+
+$/ = $\ = "\r\n";
+
+my $selector = <STDIN>;
+chomp($selector);
+
+sub unidecode {
+	my $text = shift;
+	my $qr = join('', keys %decode_chars);
+	$text =~ s/([$qr])/$decode_chars{$1}/ge;
+	$text = Text::Unidecode::unidecode($text);
+	return $text;
+}
+
+sub format_text {
+	my $text = shift;
+	$text = unidecode($text);
+
+	$text = fill($text);
+	$text =~ s/^/i/gsm;
+	return $text;
+}
+
+if ( $selector eq '' or $selector eq '/!p4608' ) {
+
+    my $mt = Mojo::Template( vars => 1 );
+
+    Mojo::IOLoop->delay(
+        sub {
+            my $delay = shift;
+            $ua->get( 'http://taz.de/!p4608/c.xml' => $delay->begin );
+            $ua->get( 'http://taz.de/!p4615/c.xml' => $delay->begin );
+        },
+        sub {
+            my ( $delay, @ressorts ) = @_;
+	my $header = qx(figlet taz.de);
+	$header =~ s/^/i/gsm;
+	print $header;
+                my $description = format_text(
+q{Das große linke Nachrichten-Portal der "tageszeitung" aus Berlin: Unabhängig dank mehr als 14.000 GenossInnen. Jetzt auch im Gopherspace.}
+                );
+                print b("\n$description\n")->encode('latin1');
+
+            for my $ressort (@ressorts) {
+		my $dom = $ressort->result->dom;
+		my $title = $dom->at('directory title')->text;
+		if ( $title ne 'taz.de' ) {
+			my $header = qx(figlet -f small $title);
+			        $header =~ s/^/i/gsm;
+				        print $header;
+
+		}
+                my @items =
+                  $dom->find('item')->slice( 0 .. 5 )->each;
+
+                for my $item (@items) {
+                    my $lead     = format_text( $item->at('lead')->text );
+                    my $kicker     = format_text( $item->at('kicker')->text );
+                    my $headline = unidecode($item->at('headline')->text);
+                    my $selector =
+                      $item->children('meta')
+                      ->first->at('url path[rel="canonical"]')->attr('href');
+
+                    print b("1$headline\t$selector\t$host\t$port\n")->encode('latin1');
+		    say b($kicker . "\n")->encode('latin1');
+                    say b($lead)->encode('latin1');
+		    print "\n";
+                }
+            }
+        }
+    )->wait;
+}
+elsif ( $selector =~ /!([0-9]+)/ ) {
+    style_text($1);
+}
+
+__DATA__
+
+@@ Startseite
+
+taz.de
+------
+
+Das große linke Nachrichten-Portal der "tageszeitung" aus Berlin: Unabhängig
+dank mehr als 14.000 GenossInnen. Jetzt auch im Gopherspace.
+
+% 
