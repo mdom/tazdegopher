@@ -4,16 +4,21 @@ use strict;
 use warnings;
 use feature qw(say);
 use utf8;
+use FindBin;
 
+use lib "$FindBin::Bin/../lib";
 use lib qw(/home/devel/mdom/perl5/jessie/lib/perl5);
 use Mojo::IOLoop;
 use Mojo::UserAgent;
 use Mojo::ByteStream qw(b);
 use Text::Wrap qw();
-use Mojo::Util qw(trim);
+use Mojo::Util qw(dumper html_unescape);
 use IO::Handle;
 use Text::Unidecode qw();
 use Mojo::Loader qw(data_section);
+use Mojo::Template;
+use Taz::Article;
+use Taz::List;
 
 STDOUT->autoflush(1);
 
@@ -22,15 +27,15 @@ my $host = 'balin.edv.taz.de';
 my $port = 70;
 
 my %decode_chars = (
-	'Ä' => 'Ae',
-	'ä' => 'ae',
-	'Ö' => 'Oe',
-	'ö' => 'oe',
-	'Ü' => 'Ue',
-	'ü' => 'ue',
-	'ß' => 'ss',
-	'“' => '"',
-	'„' => '"',
+    'Ä'  => 'Ae',
+    'ä'  => 'ae',
+    'Ö'  => 'Oe',
+    'ö'  => 'oe',
+    'Ü'  => 'Ue',
+    'ü'  => 'ue',
+    'ß'  => 'ss',
+    '“' => '"',
+    '„' => '"',
 );
 
 sub fill {
@@ -46,113 +51,202 @@ sub box {
     return $text;
 }
 
-sub style_text {
-
-    my $id  = shift;
-    my $ua  = Mojo::UserAgent->new;
-    my $dom = $ua->get("http://taz.de/!$id/c.xml")->res->dom;
-
-    my $lead     = $dom->at('lead')->text;
-    my $headline = $dom->at('headline')->text;
-
-    my $corpus = $dom->at('corpus');
-    $corpus->find('b')->map( sub { $_->content( '*' . $_->content . '*' ) } );
-    $corpus->find('h6')
-      ->map( sub { $_->content( '# ' . $_->content . ' #' ) } );
-    $corpus->descendant_nodes->map('strip')
-      ->map( sub { $_->content( trim( $_->content ) ) } );
-
-    my $content = $corpus->content;
-    $content =~ s/&amp;/&/g;
-
-    say b( format_text($headline))->encode('latin1'), "\n";
-    say b( format_text($lead))->encode('latin1'), "\n";
-    say b( format_text($content))->encode('latin1');
-}
-
 $/ = $\ = "\r\n";
 
 my $selector = <STDIN>;
 chomp($selector);
 
 sub unidecode {
-	my $text = shift;
-	my $qr = join('', keys %decode_chars);
-	$text =~ s/([$qr])/$decode_chars{$1}/ge;
-	$text = Text::Unidecode::unidecode($text);
-	return $text;
+    my $text = shift;
+    my $qr = join( '', keys %decode_chars );
+    $text =~ s/([$qr])/$decode_chars{$1}/ge;
+    $text =~ s/&amp;/&/g;
+    $text = Text::Unidecode::unidecode($text);
+    return $text;
 }
 
 sub format_text {
-	my $text = shift;
-	$text = unidecode($text);
+    my $text = shift;
+    $text = fill($text);
+    $text =~ s/^/i/gsm;
+    return $text;
+}
 
-	$text = fill($text);
-	$text =~ s/^/i/gsm;
-	return $text;
+sub render {
+    my ( $file, $vars ) = @_;
+    my $mt = Mojo::Template->new( vars => 1, escape => \&format_text );
+    no strict 'refs';
+    no warnings 'redefine';
+    local *{"@{[$mt->namespace]}::format_text"} = \&format_text;
+    local *{"@{[$mt->namespace]}::gophermap"} = sub {
+	    my ($headline,$selector) = @_;
+	    join("\t","1$headline",$selector,$host,$port);
+    };
+    $mt->parse( data_section(__PACKAGE__)->{$file} );
+    print unidecode( html_unescape( $mt->process($vars) ) );
 }
 
 if ( $selector eq '' or $selector eq '/!p4608' ) {
 
-    my $mt = Mojo::Template( vars => 1 );
+    my %articles_used;
 
     Mojo::IOLoop->delay(
         sub {
             my $delay = shift;
+            $ua->get( 'http://taz.de/static/tazfbftp/xml/genossenschaft.xml' =>
+                  $delay->begin );
             $ua->get( 'http://taz.de/!p4608/c.xml' => $delay->begin );
             $ua->get( 'http://taz.de/!p4615/c.xml' => $delay->begin );
+            $ua->get( 'http://taz.de/!p4610/c.xml' => $delay->begin );
         },
         sub {
-            my ( $delay, @ressorts ) = @_;
-	my $header = qx(figlet taz.de);
-	$header =~ s/^/i/gsm;
-	print $header;
-                my $description = format_text(
-q{Das große linke Nachrichten-Portal der "tageszeitung" aus Berlin: Unabhängig dank mehr als 14.000 GenossInnen. Jetzt auch im Gopherspace.}
-                );
-                print b("\n$description\n")->encode('latin1');
+            my ( $delay, $geno, @responses ) = @_;
 
-            for my $ressort (@ressorts) {
-		my $dom = $ressort->result->dom;
-		my $title = $dom->at('directory title')->text;
-		if ( $title ne 'taz.de' ) {
-			my $header = qx(figlet -f small $title);
-			        $header =~ s/^/i/gsm;
-				        print $header;
+            my $members_count =
+              $geno->result->dom->at('item[role="members-count"] corpus')->text;
 
-		}
+            my @lists =
+              map { Taz::List->new( tree => $_->result->dom ) } @responses;
+            for my $list (@lists) {
                 my @items =
-                  $dom->find('item')->slice( 0 .. 5 )->each;
-
-                for my $item (@items) {
-                    my $lead     = format_text( $item->at('lead')->text );
-                    my $kicker     = format_text( $item->at('kicker')->text );
-                    my $headline = unidecode($item->at('headline')->text);
-                    my $selector =
-                      $item->children('meta')
-                      ->first->at('url path[rel="canonical"]')->attr('href');
-
-                    print b("1$headline\t$selector\t$host\t$port\n")->encode('latin1');
-		    say b($kicker . "\n")->encode('latin1');
-                    say b($lead)->encode('latin1');
-		    print "\n";
+                  grep { !$articles_used{ $_->id }; } @{ $list->items };
+                if ( $list->title eq 'taz.de' ) {
+                    splice( @items, 8 );
                 }
+                else {
+                    splice( @items, 4 );
+                }
+                for my $item (@items) {
+                    $articles_used{ $item->id }++;
+                }
+                $list->items( \@items );
             }
+
+            render(
+                'startseite.txt',
+                {
+                    lists         => \@lists,
+                    host          => $host,
+                    port          => $port,
+                    members_count => $members_count
+                }
+            );
         }
     )->wait;
 }
-elsif ( $selector =~ /!([0-9]+)/ ) {
-    style_text($1);
+elsif ( $selector =~ /(![0-9]+)/ ) {
+    my $dom = $ua->get("http://taz.de/$1/c.xml")->res->dom;
+    my $item = Taz::Article->new( tree => $dom );
+    render(
+        'artikel.txt',
+        {
+            item => $item,
+        }
+    );
+}
+elsif ( $selector =~ /(!(t|a|p)[0-9]+)/ ) {
+    my $dom = $ua->get("http://taz.de/$1/c.xml")->res->dom;
+    my $list = Taz::List->new( tree => $dom );
+    render(
+        'liste.txt',
+        {
+            list => $list,
+        }
+    );
 }
 
 __DATA__
 
-@@ Startseite
+@@ startseite.txt
 
-taz.de
-------
+itaz.de
 
-Das große linke Nachrichten-Portal der "tageszeitung" aus Berlin: Unabhängig
-dank mehr als 14.000 GenossInnen. Jetzt auch im Gopherspace.
+iDas große linke Nachrichten-Portal der "tageszeitung" aus Berlin: Unabhängig
+idank <%= $members_count %> GenossInnen. Jetzt auch im Gopherspace.
 
-% 
+i---------------------------------------------------------------------------
+
+% for my $list ( @$lists ) {
+% if ( $list->{title} ne 'taz.de' ) {
+i----------------------------------
+i<%= $list->title %>
+i----------------------------------
+
+% }
+% for my $item (@{ $list->items }) {
+%    my @authors =  map { $_->name } @{ $item->authors };
+%    my $lead     = $item->lead;
+%    if ( $lead && @authors ) {
+%      $lead = $lead . ' ('. join(', ',@authors) . ')'
+%    }
+%    my $kicker   = $item->kicker;
+%    my $headline = $item->headline;
+%    my $selector = $item->url;
+%    if ( !$headline && $kicker ) {
+%= gophermap $kicker => $selector
+%    }
+%    else {
+%= gophermap $headline => $selector
+%== $kicker
+%    }
+
+%== $lead
+
+% }
+% }
+
+
+@@ liste.txt
+
+i----------------------------------
+i<%= $list->title %>
+i----------------------------------
+
+% for my $item (@{ $list->items }) {
+%    my $lead     = $item->lead;
+%    my $kicker   = $item->kicker;
+%    my $headline = $item->headline;
+%    my $selector = $item->url;
+%    if ( !$headline && $kicker ) {
+%= gophermap $kicker => $selector
+%    }
+%    else {
+%= gophermap $headline => $selector
+%== $kicker
+%    }
+
+%== $lead
+
+% }
+
+@@ artikel.txt
+
+%== $item->headline
+
+%== $item->lead
+
+i-------------------------------
+
+%== $item->corpus
+%
+% my @authors = grep { $_->url } @{ $item->authors };
+% if ( @authors ) {
+
+i-------------------------------
+i AUTOREN
+i-------------------------------
+
+% for my $author ( @authors ) {
+%= gophermap $author->name => $author->url
+% }
+% }
+
+% if ( @{ $item->tags } ) {
+i-------------------------------
+i TAGS
+i-------------------------------
+
+% for my $tag ( @{ $item->tags } ) {
+%= gophermap $tag->title => $tag->link
+% }
+% }
