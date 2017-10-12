@@ -3,6 +3,7 @@ use Mojo::Base -base;
 use Taz::Article;
 
 has 'tree';
+has 'length';
 
 has title => sub { shift->tree->at('directory > title')->all_text };
 has items => sub {

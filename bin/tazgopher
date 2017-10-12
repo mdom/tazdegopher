@@ -95,27 +95,35 @@ if ( $selector eq '' or $selector eq '/!p4608' ) {
             my $delay = shift;
             $ua->get( 'http://taz.de/static/tazfbftp/xml/genossenschaft.xml' =>
                   $delay->begin );
+            $ua->get( 'http://taz.de/!p4608/l.xml' => $delay->begin );
             $ua->get( 'http://taz.de/!p4608/c.xml' => $delay->begin );
-            $ua->get( 'http://taz.de/!p4615/c.xml' => $delay->begin );
-            $ua->get( 'http://taz.de/!p4610/c.xml' => $delay->begin );
         },
+        sub {
+            my ( $delay, $geno, $l_xml, $c_xml) = @_;
+	    $delay->pass($geno, $l_xml, $c_xml);
+	    for my $clip_id ($l_xml->result->dom->find('pages page[type="clip"]')->map(attr => 'id')->each) {
+	      $ua->get( "http://taz.de/!p$clip_id/c-l.xml" => $delay->begin );
+	      $ua->get( "http://taz.de/!p$clip_id/c.xml" => $delay->begin );
+	    }
+    },
         sub {
             my ( $delay, $geno, @responses ) = @_;
 
             my $members_count =
               $geno->result->dom->at('item[role="members-count"] corpus')->text;
 
-            my @lists =
-              map { Taz::List->new( tree => $_->result->dom ) } @responses;
+	    my @lists;
+	    while ( @responses ) {
+		    my ( $l_xml, $c_xml) = splice(@responses,0,2);
+		    my $length = $l_xml->result->dom->find('linklist[type="self"]')->map(attr => 'length')->reduce(sub { $a + $b });
+
+		    push @lists, Taz::List->new( tree => $c_xml->result->dom, length => $length );
+	    }
+
             for my $list (@lists) {
                 my @items =
-                  grep { !$articles_used{ $_->id }; } @{ $list->items };
-                if ( $list->title eq 'taz.de' ) {
-                    splice( @items, 8 );
-                }
-                else {
-                    splice( @items, 4 );
-                }
+                  grep { !$articles_used{ $_->id } } @{ $list->items };
+                splice( @items, $list->length );
                 for my $item (@items) {
                     $articles_used{ $item->id }++;
                 }
@@ -167,9 +175,9 @@ idank <%= $members_count %> GenossInnen. Jetzt auch im Gopherspace.
 i---------------------------------------------------------------------------
 
 % for my $list ( @$lists ) {
-% if ( $list->{title} ne 'taz.de' ) {
+% if ( $list->title ne 'taz.de' ) {
 i----------------------------------
-i<%= $list->title %>
+i<%= uc $list->title %>
 i----------------------------------
 
 % }
