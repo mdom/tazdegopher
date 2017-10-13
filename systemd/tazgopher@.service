@@ -1,0 +1,6 @@
+[Unit]
+Description=Gopher Per-Connection Server
+
+[Service]
+ExecStart=-/opt/tazgopher/bin/tazgopher
+StandardInput=socket
