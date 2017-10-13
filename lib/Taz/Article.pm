@@ -2,21 +2,14 @@ package Taz::Article;
 use Mojo::Base -base;
 use Mojo::Util 'trim', 'dumper';
 use Taz::Author;
+use Text::Wrap ();
 
 has 'tree';
 has lead   => sub { shift->tree->find('lead')->map('all_text')->first   || '' };
 has kicker => sub { shift->tree->find('kicker')->map('all_text')->first || '' };
 has headline =>
   sub { $_[0]->tree->find('headline')->map('all_text')->first || '' };
-has corpus => sub {
-    my $corpus = shift->tree->at('corpus');
-    $corpus->find('b')->map( sub { $_->content( '*' . $_->content . '*' ) } );
-    $corpus->find('h6')
-      ->map( sub { $_->content( '# ' . $_->content . ' #' ) } );
-    $corpus->descendant_nodes->map('strip')
-      ->map( sub { $_->content( trim( $_->content ) ) } );
-    return $corpus->content;
-};
+has corpus => sub { shift->tree->at('corpus') };
 
 has id => sub {
     shift->tree->children('meta')->first->at('id[scope="url"]');
@@ -37,9 +30,54 @@ has authors => sub {
     ];
 };
 
+has published => sub {
+    my $n   = shift->tree->at('meta published dt');
+    my $y   = $n->at('y')->text;
+    my $mon = $n->at('mon')->text;
+    my $day = $n->at('day')->text;
+    return "$day.$mon.$y";
+};
+
 has 'tags' => sub {
     [ map { Taz::Tag->new( tree => $_ ) } shift->tree->find('tag')->each ];
 };
+
+sub render_corpus {
+    my $content = _render( shift->corpus );
+}
+
+sub _render {
+    my $node    = shift;
+    my $content = '';
+    for ( $node->child_nodes->each ) {
+        $content .= _render($_);
+    }
+    if ( $node->tag && $node->tag eq 'h1' ) {
+        return "====\n$content\n====\n\n";
+    }
+    if ( $node->tag && $node->tag =~ /^h\d$/ ) {
+        my $line = '-' x $Text::Wrap::columns;
+        return "$line\n$content\n$line\n\n";
+    }
+    elsif ( $node->type eq 'text' ) {
+        $content = $node->content;
+        $content =~ s/\.\s\.\s\./.../;
+        return '' if $content !~ /\S/;
+        return $content;
+    }
+    elsif ( $node->type eq 'tag' && $node->tag eq 'location' ) {
+        return "$content ";
+    }
+    elsif ( $node->type eq 'tag' && $node->tag eq 'p' ) {
+        return Text::Wrap::fill( '', '', $content ) . "\n\n";
+    }
+    elsif ( $node->type eq 'tag' && $node->tag eq 'b' ) {
+        return "*$content*";
+    }
+    else {
+        return $content;
+    }
+}
 
 package Taz::Tag;
 use Mojo::Base -base;
