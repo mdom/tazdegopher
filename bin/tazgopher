@@ -27,7 +27,7 @@ use Taz::List;
 STDOUT->autoflush(1);
 
 my $ua   = Mojo::UserAgent->new;
-my $host = 'balin.edv.taz.de';
+my $host = 'taz.de';
 my $port = 70;
 
 my %decode_chars = (
