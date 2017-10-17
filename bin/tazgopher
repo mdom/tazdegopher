@@ -27,6 +27,7 @@ use Taz::List;
 STDOUT->autoflush(1);
 
 my $ua   = Mojo::UserAgent->new;
+$ua->transactor->name('tazgopher/1.0 (+gopher@taz.de)');
 my $host = 'taz.de';
 my $port = 70;
 
@@ -55,10 +56,16 @@ sub box {
     return $text;
 }
 
-$/ = $\ = "\r\n";
+$/ = "\r\n";
 
 my $selector = <STDIN>;
 chomp($selector);
+
+my $gophertype = 1;
+if ( $selector =~ m{^/(.)(/.*)$} ) {
+	$gophertype = $1;
+	$selector = $2;
+}
 
 sub unidecode {
     my $text = shift;
@@ -72,7 +79,7 @@ sub unidecode {
 sub format_text {
     my $text = shift;
     $text = fill($text);
-    $text =~ s/^/i/gsm;
+    $text =~ s/^(.*)$/"i$1\t\t$host\t$port"/gem;
     return $text;
 }
 
@@ -82,17 +89,19 @@ sub render {
     no strict 'refs';
     no warnings 'redefine';
     local *{"@{[$mt->namespace]}::i"} =
-      sub { $_[0] =~ s/^/i/gsm; return $_[0] };
+      sub { my $t = shift; $t =~ s/^(.*)$/"i$1\t\t$host\t$port"/gem; return $t };
     local *{"@{[$mt->namespace]}::line"} = sub { $_[0] x $Text::Wrap::columns };
     local *{"@{[$mt->namespace]}::gophermap"} = sub {
         my ( $type, $headline, $selector ) = @_;
         join( "\t", "$type$headline", $selector, $host, $port );
     };
     $mt->parse( data_section(__PACKAGE__)->{$file} );
-    print unidecode( html_unescape( $mt->process($vars) ) );
+    my $output = unidecode( html_unescape( $mt->process($vars) ) );
+    $output =~ s/\n/\r\n/g;
+    print "$output.\r\n";
 }
 
-if ( $selector eq '' or $selector eq '/!p4608' ) {
+if ( $selector eq '' or $selector eq '/' or $selector eq '/!p4608' ) {
 
     my %articles_used;
 
@@ -193,24 +202,21 @@ elsif ( $selector =~ /^!s/ ) {
 __DATA__
 
 @@ startseite.txt
-
 %= i line '='
-itaz.de
+%= i 'taz.de'
 %= i line '='
-
-iDas große linke Nachrichten-Portal der "tageszeitung" aus Berlin: Unabhängig
-idank <%= $members_count %> GenossInnen. Jetzt auch im Gopherspace.
-
+%== qq{Das große linke Nachrichten-Portal der "tageszeitung" aus Berlin: Unabhängig dank $members_count GenossInnen. Jetzt auch im Gopherspace.}
+%= i ''
 %= gophermap 7 => 'Nach Artikeln suchen' => '!s'
-
+%= i ''
 %= i line '-'
-
+%= i ''
 % for my $list ( @$lists ) {
 % if ( $list->title ne 'taz.de' ) {
 %= i '-' x $Text::Wrap::columns
 %= gophermap 1 => uc($list->title) => $list->url
 %= i '-' x $Text::Wrap::columns
-
+%= i ''
 % }
 % for my $item (@{ $list->items }) {
 %    my @authors =  map { $_->name } @{ $item->authors };
@@ -226,21 +232,22 @@ idank <%= $members_count %> GenossInnen. Jetzt auch im Gopherspace.
 %    }
 %    else {
 %= gophermap 1 => $headline => $selector
+% if ( $kicker ) {
 %== $kicker
+% }
 %    }
-
+%= i ''
 %== $lead
-
+%= i ''
 % }
 % }
-
-
+%= i ''
 @@ liste.txt
-
+%= i ''
 %= i line '='
-i<%= $list->title %>
+%= i $list->title
 %= i line '='
-
+%= i ''
 % for my $item (@{ $list->items }) {
 %    my $lead     = $item->lead;
 %    my $kicker   = $item->kicker;
@@ -253,43 +260,42 @@ i<%= $list->title %>
 %= gophermap 1 => $headline => $selector
 %== $kicker
 %    }
-
+%= i ''
 %== $lead
-
+%= i ''
 % }
-
 @@ artikel.txt
-
+%= i ''
 %= i line '='
 %== $item->headline
 %= i line '='
-
+%= i ''
 %== $item->lead
-
+%= i ''
 %= i line '-'
-
+%= i ''
 %= i $item->render_corpus
-
+%= i ''
 % if ($item->published ) {
 %= i '('. $item->published . ')'
 % }
 % my @authors = grep { $_->url } @{ $item->authors };
 % if ( @authors ) {
-
+%= i ''
 %= i line '-'
-i AUTOREN
+%= i 'AUTOREN'
 %= i line '-'
-
+%= i ''
 % for my $author ( @authors ) {
 %= gophermap 1 => $author->name => $author->url
 % }
 % }
-
+%= i ''
 % if ( @{ $item->tags } ) {
 %= i line '-'
-i TAGS
+%= i 'TAGS'
 %= i line '-'
-
+%= i ''
 % for my $tag ( @{ $item->tags } ) {
 %= gophermap 1 => $tag->title => $tag->link
 % }
