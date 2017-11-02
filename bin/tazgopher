@@ -26,9 +26,18 @@ use Taz::List;
 
 STDOUT->autoflush(1);
 
-my $ua   = Mojo::UserAgent->new;
+my $ua = Mojo::UserAgent->new;
 $ua->transactor->name('tazgopher/1.0 (+gopher@taz.de)');
-my $host = 'taz.de';
+
+my $host;
+
+if ( $ENV{REMOTE_ADDR} eq '193.104.220.35' ) {
+    $host = 'ibpj4qv7mufde33w.onion';
+}
+else {
+    $host = 'taz.de';
+}
+
 my $port = 70;
 
 my %decode_chars = (
