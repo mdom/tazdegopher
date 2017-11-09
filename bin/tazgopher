@@ -55,12 +55,6 @@ sub fill {
     Text::Wrap::fill( $init, $subsequent, $text );
 }
 
-sub box {
-    my ( $text, $char ) = @_;
-    $text =~ s/^/"$char "/gesm;
-    return $text;
-}
-
 $/ = "\r\n";
 
 my $selector = <STDIN>;
