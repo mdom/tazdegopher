@@ -10,7 +10,7 @@ use IO::Handle;
 use Mojo::IOLoop;
 use Mojo::UserAgent;
 use Mojo::ByteStream qw(b);
-use Mojo::Util qw(dumper html_unescape);
+use Mojo::Util 'html_unescape';
 use Mojo::Loader qw(data_section);
 use Mojo::Template;
 use Mojo::Parameters;
