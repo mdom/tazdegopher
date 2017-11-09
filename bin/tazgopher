@@ -54,13 +54,6 @@ if ( $selector =~ m{^/(.)(/.*)$} ) {
 	$selector = $2;
 }
 
-sub format_text {
-    my $text = shift;
-    $text = fill($text);
-    $text =~ s/^(.*)$/"i$1\t\t$host\t$port"/gem;
-    return $text;
-}
-
 sub render {
     my ( $file, $vars ) = @_;
     my $mt = Mojo::Template->new( vars => 1, escape => \&format_text );
