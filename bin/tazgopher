@@ -2,7 +2,7 @@
 
 use strict;
 use warnings;
-use feature qw(say);
+use feature qw(state);
 use utf8;
 use Text::Wrap qw();
 use IO::Handle;
@@ -36,18 +36,6 @@ else {
 
 my $port = 70;
 
-my %decode_chars = (
-    'Ä'  => 'Ae',
-    'ä'  => 'ae',
-    'Ö'  => 'Oe',
-    'ö'  => 'oe',
-    'Ü'  => 'Ue',
-    'ü'  => 'ue',
-    'ß'  => 'ss',
-    '“' => '"',
-    '„' => '"',
-);
-
 sub fill {
     my ( $text, $init, $subsequent ) = @_;
     $init       ||= '';
@@ -64,15 +52,6 @@ my $gophertype = 1;
 if ( $selector =~ m{^/(.)(/.*)$} ) {
 	$gophertype = $1;
 	$selector = $2;
-}
-
-sub unidecode {
-    my $text = shift;
-    my $qr = join( '', keys %decode_chars );
-    $text =~ s/([$qr])/$decode_chars{$1}/ge;
-    $text =~ s/&amp;/&/g;
-    $text = Text::Unidecode::unidecode($text);
-    return $text;
 }
 
 sub format_text {
@@ -196,6 +175,27 @@ elsif ( $selector =~ /^!s/ ) {
             list => $list,
         }
     );
+}
+
+sub unidecode {
+    state %decode_chars = (
+        'Ä'  => 'Ae',
+        'ä'  => 'ae',
+        'Ö'  => 'Oe',
+        'ö'  => 'oe',
+        'Ü'  => 'Ue',
+        'ü'  => 'ue',
+        'ß'  => 'ss',
+        '“' => '"',
+        '„' => '"',
+    );
+
+    my $text = shift;
+    my $qr = join( '', keys %decode_chars );
+    $text =~ s/([$qr])/$decode_chars{$1}/ge;
+    $text =~ s/&amp;/&/g;
+    $text = Text::Unidecode::unidecode($text);
+    return $text;
 }
 
 __DATA__
