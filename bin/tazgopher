@@ -50,26 +50,8 @@ chomp($selector);
 
 my $gophertype = 1;
 if ( $selector =~ m{^/(.)(/.*)$} ) {
-	$gophertype = $1;
-	$selector = $2;
-}
-
-sub render {
-    my ( $file, $vars ) = @_;
-    my $mt = Mojo::Template->new( vars => 1, escape => \&format_text );
-    no strict 'refs';
-    no warnings 'redefine';
-    local *{"@{[$mt->namespace]}::i"} =
-      sub { my $t = shift; $t =~ s/^(.*)$/"i$1\t\t$host\t$port"/gem; return $t };
-    local *{"@{[$mt->namespace]}::line"} = sub { $_[0] x $Text::Wrap::columns };
-    local *{"@{[$mt->namespace]}::gophermap"} = sub {
-        my ( $type, $headline, $selector ) = @_;
-        join( "\t", "$type$headline", $selector, $host, $port );
-    };
-    $mt->parse( data_section(__PACKAGE__)->{$file} );
-    my $output = unidecode( html_unescape( $mt->process($vars) ) );
-    $output =~ s/\n/\r\n/g;
-    print "$output.\r\n";
+    $gophertype = $1;
+    $selector   = $2;
 }
 
 if ( $selector eq '' or $selector eq '/' or $selector eq '/!p4608' ) {
@@ -189,6 +171,28 @@ sub unidecode {
     $text =~ s/&amp;/&/g;
     $text = Text::Unidecode::unidecode($text);
     return $text;
+}
+
+sub render {
+    my ( $file, $vars ) = @_;
+    my $mt = Mojo::Template->new( vars => 1 );
+
+    no strict 'refs';
+    no warnings 'redefine';
+    local *{"@{[$mt->namespace]}::line"} = sub { $_[0] x $Text::Wrap::columns };
+    local *{"@{[$mt->namespace]}::wrap"} = sub { wrap( $_[0] ) };
+    local *{"@{[$mt->namespace]}::gophermap"} = sub {
+        my ( $type, $headline, $selector ) = @_;
+        join( "\t", "$type$headline", $selector, $host, $port );
+    };
+
+    $mt->parse( data_section(__PACKAGE__)->{$file} );
+    my $output = unidecode( html_unescape( $mt->process($vars) ) );
+    if ( $gophertype == 1 ) {
+        $output =~ s/^([^\t\n]*?)$/"i$1\t\t$host\t$port"/sgem;
+    }
+    $output =~ s/\n/\r\n/g;
+    print "$output.\r\n";
 }
 
 __DATA__
