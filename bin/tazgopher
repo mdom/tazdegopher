@@ -198,21 +198,21 @@ sub render {
 __DATA__
 
 @@ startseite.txt
-%= i line '='
-%= i 'taz.de'
-%= i line '='
-%== qq{Das große linke Nachrichten-Portal der "tageszeitung" aus Berlin: Unabhängig dank $members_count GenossInnen. Jetzt auch im Gopherspace.}
-%= i ''
+%= line '='
+taz.de
+%= line '='
+%= wrap(qq{Das große linke Nachrichten-Portal der "tageszeitung" aus Berlin: Unabhängig dank $members_count GenossInnen. Jetzt auch im Gopherspace.})
+
 %= gophermap 7 => 'Nach Artikeln suchen' => '!s'
-%= i ''
-%= i line '-'
-%= i ''
+
+%= line '-'
+
 % for my $list ( @$lists ) {
 % if ( $list->title ne 'taz.de' ) {
-%= i '-' x $Text::Wrap::columns
+%= '-' x $Text::Wrap::columns
 %= gophermap 1 => uc($list->title) => $list->url
-%= i '-' x $Text::Wrap::columns
-%= i ''
+%= '-' x $Text::Wrap::columns
+
 % }
 % for my $item (@{ $list->items }) {
 %    my @authors =  map { $_->name } @{ $item->authors };
@@ -229,69 +229,63 @@ __DATA__
 %    else {
 %= gophermap 1 => $headline => $selector
 % if ( $kicker ) {
-%== $kicker
+%= wrap($kicker)
 % }
 %    }
-%= i ''
-%== $lead
-%= i ''
+
+%= wrap($lead);
+
 % }
 % }
-%= i ''
 @@ liste.txt
-%= i ''
-%= i line '='
-%= i $list->title
-%= i line '='
-%= i ''
+
+%= line '='
+%= $list->title
+%= line '='
+
 % for my $item (@{ $list->items }) {
 %    my $lead     = $item->lead;
 %    my $kicker   = $item->kicker;
 %    my $headline = $item->headline;
 %    my $selector = $item->url;
 %    if ( !$headline && $kicker ) {
-%= gophermap 1 => $kicker => $selector
+%=     gophermap 1 => $kicker => $selector
+%    }  else {
+%=     gophermap 1 => $headline => $selector
+%        if ( $kicker ) {
+%=         wrap($kicker)
+%        }
 %    }
-%    else {
-%= gophermap 1 => $headline => $selector
-%== $kicker
-%    }
-%= i ''
-%== $lead
-%= i ''
+% if ( $lead ) {
+%= wrap($lead)
+% }
 % }
 @@ artikel.txt
-%= i ''
-%= i line '='
-%== $item->headline
-%= i line '='
-%= i ''
-%== $item->lead
-%= i ''
-%= i line '-'
-%= i ''
-%= i $item->render_corpus
-%= i ''
+
+%= line '='
+%= wrap($item->headline)
+%= line '='
+%= wrap($item->lead)
+%= line '-'
+
+%= $item->render_corpus
+
 % if ($item->published ) {
-%= i '('. $item->published . ')'
+%= '('. $item->published . ')'
 % }
 % my @authors = grep { $_->url } @{ $item->authors };
 % if ( @authors ) {
-%= i ''
-%= i line '-'
-%= i 'AUTOREN'
-%= i line '-'
-%= i ''
+%= line '-'
+AUTOREN
+%= line '-'
 % for my $author ( @authors ) {
 %= gophermap 1 => $author->name => $author->url
 % }
 % }
-%= i ''
 % if ( @{ $item->tags } ) {
-%= i line '-'
-%= i 'TAGS'
-%= i line '-'
-%= i ''
+%= line '-'
+TAGS
+%= line '-'
 % for my $tag ( @{ $item->tags } ) {
 %= gophermap 1 => $tag->title => $tag->link
 % }
