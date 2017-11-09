@@ -25,16 +25,12 @@ STDOUT->autoflush(1);
 my $ua = Mojo::UserAgent->new;
 $ua->transactor->name('tazgopher/1.0 (+gopher@taz.de)');
 
-my $host;
+my $host = 'taz.de';
+my $port = 70;
 
 if ( $ENV{REMOTE_ADDR} && $ENV{REMOTE_ADDR} eq '193.104.220.35' ) {
     $host = 'ibpj4qv7mufde33w.onion';
 }
-else {
-    $host = 'taz.de';
-}
-
-my $port = 70;
 
 sub wrap {
     my ( $text, $init, $subsequent ) = @_;
