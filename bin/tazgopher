@@ -36,7 +36,7 @@ else {
 
 my $port = 70;
 
-sub fill {
+sub wrap {
     my ( $text, $init, $subsequent ) = @_;
     $init       ||= '';
     $subsequent ||= '';
