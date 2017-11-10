@@ -244,7 +244,6 @@ taz.de
 % }
 @@ liste.txt
 
-%= line '='
 %= $list->title
 %= line '='
 
@@ -268,9 +267,9 @@ taz.de
 @@ artikel.txt
 
 %= line '='
-%= wrap($item->headline)
-%= line '='
+
 %= wrap($item->lead)
+
 %= line '-'
 
 %= $item->render_corpus
@@ -280,7 +279,7 @@ taz.de
 % }
 % my @authors = grep { $_->url } @{ $item->authors };
 % if ( @authors ) {
-%= line '-'
+
 AUTOREN
 %= line '-'
 % for my $author ( @authors ) {
@@ -288,7 +287,7 @@ AUTOREN
 % }
 % }
 % if ( @{ $item->tags } ) {
-%= line '-'
+
 TAGS
 %= line '-'
 % for my $tag ( @{ $item->tags } ) {

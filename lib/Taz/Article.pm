@@ -53,11 +53,10 @@ sub _render {
         $content .= _render($_);
     }
     if ( $node->tag && $node->tag eq 'h1' ) {
-        return "====\n$content\n====\n\n";
+        return "$content\n" . ( '=' x length($content) ) . "\n\n";
     }
-    if ( $node->tag && $node->tag =~ /^h\d$/ ) {
-        my $line = '-' x $Text::Wrap::columns;
-        return "$line\n$content\n$line\n\n";
+    if ( $node->tag && $node->tag =~ /^h(\d)$/ ) {
+        return ( '#' x $1 ) . " $content\n\n";
     }
     elsif ( $node->type eq 'text' ) {
         $content = $node->content;
