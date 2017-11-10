@@ -266,16 +266,29 @@ taz.de
 % }
 @@ artikel.txt
 
+%= $item->headline
 %= line '='
 
 %= wrap($item->lead)
 
 %= line '-'
 
-%= $item->render_corpus
+% my ($content, @links ) = $item->render_corpus;
+%= $content
 
 % if ($item->published ) {
 %= '('. $item->published . ')'
+% }
+% if (@links ) {
+
+LINKS
+%= line '-'
+% my $cnt = 1;
+% for my $link ( @links ) {
+% my $type = $link->[1] =~ /^URL:/ ? 'h' : 1;
+%= gophermap $type => "[$cnt]: " . $link->[0] => $link->[1]
+% $cnt++
+% }
 % }
 % my @authors = grep { $_->url } @{ $item->authors };
 % if ( @authors ) {

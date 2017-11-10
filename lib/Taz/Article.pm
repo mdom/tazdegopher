@@ -43,14 +43,16 @@ has 'tags' => sub {
 };
 
 sub render_corpus {
-    my $content = _render( shift->corpus );
+    my @links;
+    my $content = _render( shift->corpus, \@links );
+    return $content, @links;
 }
 
 sub _render {
-    my $node    = shift;
+    my ( $node, $links ) = @_;
     my $content = '';
     for ( $node->child_nodes->each ) {
-        $content .= _render($_);
+        $content .= _render( $_, $links );
     }
     if ( $node->tag && $node->tag eq 'h1' ) {
         return "$content\n" . ( '=' x length($content) ) . "\n\n";
@@ -62,6 +64,20 @@ sub _render {
         $content = $node->content;
         $content =~ s/\.\s\.\s\./.../;
         return '' if $content !~ /\S/;
+        return $content;
+    }
+    elsif ( $node->type eq 'tag' && $node->tag eq 'a' ) {
+        my $href = $node->attr('href');
+        if ($href) {
+            my $url = Mojo::URL->new($href);
+            if ( $url->host =~ /^(www\.)?taz.de$/ ) {
+                push @$links, [ $content => $url->path ];
+            }
+            else {
+                push @$links, [ $content => "URL:$url" ];
+            }
+            return "\[$content\]\[" . @$links . "]";
+        }
         return $content;
     }
     elsif ( $node->type eq 'tag' && $node->tag eq 'location' ) {
