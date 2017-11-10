@@ -2,7 +2,6 @@
 
 use strict;
 use warnings;
-use feature qw(state);
 use utf8;
 use Text::Wrap qw();
 use IO::Handle;
@@ -149,21 +148,29 @@ elsif ( $selector =~ /^!s/ ) {
 }
 
 sub unidecode {
-    state %decode_chars;
-    if ( !%decode_chars ) {
-        %decode_chars = (
-            'Ä'  => 'Ae',
-            'ä'  => 'ae',
-            'Ö'  => 'Oe',
-            'ö'  => 'oe',
-            'Ü'  => 'Ue',
-            'ü'  => 'ue',
-            'ß'  => 'ss',
-            '“' => '"',
-            '„' => '"',
-        );
-    }
     my $text = shift;
+
+    my %uppercase_umlauts = (
+        'Ä' => 'Ae',
+        'Ö' => 'Oe',
+        'Ü' => 'Ue',
+        'ß' => 'ss',
+    );
+
+    my $uc_qr = '([' . join( '', keys %uppercase_umlauts ) . '])';
+    $text =~ s/(?<=[[:upper:]])$uc_qr/uc $uppercase_umlauts{$1}/ge;
+    $text =~ s/$uc_qr(?=[[:upper:]])/uc $uppercase_umlauts{$1}/ge;
+
+    my %decode_chars = (
+        'ä'  => 'ae',
+        'ö'  => 'oe',
+        'ü'  => 'ue',
+        'ß'  => 'ss',
+        '“' => '"',
+        '„' => '"',
+        %uppercase_umlauts
+    );
+
     my $qr = '([' . join( '', keys %decode_chars ) . '])';
     $text =~ s/$qr/$decode_chars{$1}/ge;
     $text =~ s/&amp;/&/g;
