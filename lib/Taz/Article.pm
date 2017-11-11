@@ -70,7 +70,7 @@ sub _render {
         my $href = $node->attr('href');
         if ($href) {
             my $url = Mojo::URL->new($href);
-            if ( $url->host =~ /^(www\.)?taz.de$/ ) {
+            if ( !$url->host || $url->host =~ /^(www\.)?taz.de$/ ) {
                 push @$links, [ $content => $url->path ];
             }
             else {
