@@ -43,6 +43,15 @@ $/ = "\r\n";
 my $selector = <STDIN>;
 chomp($selector);
 
+my $url = Mojo::URL->new($selector);
+
+$selector = $url->path;
+my $wrap = $url->query->param('wrap');
+
+if ( $wrap ) {
+    $Text::Wrap::columns = $wrap;
+}
+
 my $gophertype = 1;
 if ( $selector =~ m{^/(.)(/.*)$} ) {
     $gophertype = $1;
@@ -188,6 +197,11 @@ sub render {
     local *{"@{[$mt->namespace]}::wrap"} = sub { wrap( $_[0] ) };
     local *{"@{[$mt->namespace]}::gophermap"} = sub {
         my ( $type, $headline, $selector ) = @_;
+        if ($wrap) {
+            my $url = Mojo::URL->new($selector);
+            $url->query->merge( wrap => $wrap );
+            $selector = $url->path_query;
+        }
         join( "\t", "$type$headline", $selector, $host, $port );
     };
 
