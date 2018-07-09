@@ -43,13 +43,16 @@ $/ = "\r\n";
 my $selector = <STDIN>;
 chomp($selector);
 
-my $url = Mojo::URL->new($selector);
+my $query;
+( $selector, $query ) = split( "\t", $selector, 2 );
+
+my $url = Mojo::URL->new( $selector || '/' );
 
 $selector = $url->path;
 my $wrap = $url->query->param('wrap');
 
-if ( $wrap ) {
-    $Text::Wrap::columns = $wrap;
+if ($wrap) {
+    $Text::Wrap::columns = $wrap || 76;
 }
 
 my $gophertype = 1;
@@ -143,8 +146,7 @@ elsif ( $selector =~ /(![tap][0-9]+)/ ) {
     );
 }
 elsif ( $selector =~ /^!s/ ) {
-    my ( $selector, $args ) = split( "\t", $selector, 2 );
-    my $param = Mojo::Parameters->new( s => "$args" );
+    my $param = Mojo::Parameters->new( s => "$query" );
     my $s     = $param->to_string;
     my $dom   = $ua->get("http://taz.de/!$s/c.xml")->res->dom;
     my $list  = Taz::List->new( tree => $dom );
