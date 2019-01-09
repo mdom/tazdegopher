@@ -38,10 +38,8 @@ sub wrap {
     Text::Wrap::fill( $init, $subsequent, $text );
 }
 
-$/ = "\r\n";
-
 my $selector = <STDIN>;
-chomp($selector);
+$selector =~ s/\r?\n//;
 
 my $query;
 ( $selector, $query ) = split( "\t", $selector, 2 );
