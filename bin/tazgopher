@@ -69,10 +69,10 @@ if ( $selector eq '' or $selector eq '/' or $selector eq '/!p4608' ) {
     Mojo::IOLoop->delay(
         sub {
             my $delay = shift;
-            $ua->get( 'http://taz.de/static/tazfbftp/xml/genossenschaft.xml' =>
+            $ua->get( 'https://taz.de/static/tazfbftp/xml/genossenschaft.xml' =>
                   $delay->begin );
-            $ua->get( 'http://taz.de/!p4608/l.xml' => $delay->begin );
-            $ua->get( 'http://taz.de/!p4608/c.xml' => $delay->begin );
+            $ua->get( 'https://taz.de/!p4608/l.xml' => $delay->begin );
+            $ua->get( 'https://taz.de/!p4608/c.xml' => $delay->begin );
         },
         sub {
             my ( $delay, $geno, $l_xml, $c_xml ) = @_;
@@ -81,8 +81,8 @@ if ( $selector eq '' or $selector eq '/' or $selector eq '/!p4608' ) {
               my $clip_id ( $l_xml->result->dom->find('pages page[type="clip"]')
                 ->map( attr => 'id' )->each )
             {
-                $ua->get( "http://taz.de/!p$clip_id/c-l.xml" => $delay->begin );
-                $ua->get( "http://taz.de/!p$clip_id/c.xml"   => $delay->begin );
+                $ua->get( "https://taz.de/!p$clip_id/c-l.xml" => $delay->begin );
+                $ua->get( "https://taz.de/!p$clip_id/c.xml"   => $delay->begin );
             }
         },
         sub {
@@ -127,7 +127,7 @@ if ( $selector eq '' or $selector eq '/' or $selector eq '/!p4608' ) {
     )->wait;
 }
 elsif ( $selector =~ /(![0-9]+)/ ) {
-    my $dom = $ua->get("http://taz.de/$1/c.xml")->res->dom;
+    my $dom = $ua->get("https://taz.de/$1/c.xml")->res->dom;
     my $item = Taz::Article->new( tree => $dom );
     render(
         'artikel.txt',
@@ -137,7 +137,7 @@ elsif ( $selector =~ /(![0-9]+)/ ) {
     );
 }
 elsif ( $selector =~ /(![tap][0-9]+)/ ) {
-    my $dom = $ua->get("http://taz.de/$1/c.xml")->res->dom;
+    my $dom = $ua->get("https://taz.de/$1/c.xml")->res->dom;
     my $list = Taz::List->new( tree => $dom );
     render(
         'liste.txt',
@@ -149,7 +149,7 @@ elsif ( $selector =~ /(![tap][0-9]+)/ ) {
 elsif ( $selector =~ /^!s/ ) {
     my $param = Mojo::Parameters->new( s => "$query" );
     my $s     = $param->to_string;
-    my $dom   = $ua->get("http://taz.de/!$s/c.xml")->res->dom;
+    my $dom   = $ua->get("https://taz.de/!$s/c.xml")->res->dom;
     my $list  = Taz::List->new( tree => $dom );
     render(
         'liste.txt',
