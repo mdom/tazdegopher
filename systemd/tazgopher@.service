@@ -5,3 +5,4 @@ Description=Gopher Per-Connection Server
 ExecStart=-/opt/tazgopher/bin/tazgopher
 Environment=MOJO_MAX_REDIRECTS=5
 StandardInput=socket
+DynamicUser=yes
