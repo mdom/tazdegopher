@@ -9,7 +9,7 @@ has lead   => sub { shift->tree->find('lead')->map('all_text')->first   || '' };
 has kicker => sub { shift->tree->find('kicker')->map('all_text')->first || '' };
 has headline =>
   sub { $_[0]->tree->find('headline')->map('all_text')->first || '' };
-has corpus => sub { shift->tree->at('corpus') };
+has corpus => sub { shift->tree->at('content > item > corpus') };
 
 has id => sub {
     shift->tree->children('meta')->first->at('id[scope="url"]');
