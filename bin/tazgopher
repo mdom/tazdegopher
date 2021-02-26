@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-use strict;
+use Mojo::Base -strict, -async_await;
 use warnings;
 use FindBin '$Bin';
 use lib "$Bin/../lib", "$Bin/../extlib";
@@ -9,7 +9,6 @@ use utf8;
 use Text::Wrap qw();
 use IO::Handle;
 
-use Mojo::IOLoop;
 use Mojo::UserAgent;
 use Mojo::ByteStream qw(b);
 use Mojo::Util 'html_unescape';
@@ -66,72 +65,72 @@ if ( $selector =~ m{^/(.)(/.*)$} ) {
     $selector   = $2;
 }
 
+async sub render_startpage {
+    my %articles_used;
+    my @lists;
+
+    my $geno =
+      await $ua->get_p('https://taz.de/static/tazfbftp/xml/genossenschaft.xml');
+    my $members_count =
+      $geno->result->dom->at('item[role="members-count"] corpus')->text;
+
+    my $l_xml = await $ua->get_p('https://taz.de/!p4608/l.xml');
+    my $c_xml = await $ua->get_p('https://taz.de/!p4608/c.xml');
+
+    my $length = $l_xml->result->dom->find('linklist[type="self"]')
+      ->map( attr => 'length' )->reduce( sub { $a + $b } );
+
+    push @lists,
+      Taz::List->new(
+        tree   => $c_xml->result->dom,
+        length => $length
+      );
+
+    my @clip_ids =
+      $l_xml->result->dom->find('pages page[type="clip"]')->map( attr => 'id' )
+      ->each;
+
+    for my $clip_id (@clip_ids) {
+        my $l_xml = await $ua->get_p("https://taz.de/!p$clip_id/c-l.xml");
+        my $c_xml = await $ua->get_p("https://taz.de/!p$clip_id/c.xml");
+
+        my $length = $l_xml->result->dom->find('linklist[type="self"]')
+          ->map( attr => 'length' )->reduce( sub { $a + $b } );
+
+        push @lists,
+          Taz::List->new(
+            tree   => $c_xml->result->dom,
+            length => $length
+          );
+    }
+
+    for my $list (@lists) {
+        my @items =
+          grep { !$articles_used{ $_->id } } @{ $list->items };
+        splice( @items, $list->length );
+        for my $item (@items) {
+            $articles_used{ $item->id }++;
+        }
+        $list->items( \@items );
+    }
+
+    render(
+        'startseite.txt',
+        {
+            lists         => \@lists,
+            host          => $host,
+            port          => $port,
+            members_count => $members_count
+        }
+    );
+}
+
 if ( $selector eq '' or $selector eq '/' or $selector eq '/!p4608' ) {
 
-    my %articles_used;
-
-    Mojo::IOLoop->delay(
-        sub {
-            my $delay = shift;
-            $ua->get( 'https://taz.de/static/tazfbftp/xml/genossenschaft.xml' =>
-                  $delay->begin );
-            $ua->get( 'https://taz.de/!p4608/l.xml' => $delay->begin );
-            $ua->get( 'https://taz.de/!p4608/c.xml' => $delay->begin );
-        },
-        sub {
-            my ( $delay, $geno, $l_xml, $c_xml ) = @_;
-            $delay->pass( $geno, $l_xml, $c_xml );
-            for
-              my $clip_id ( $l_xml->result->dom->find('pages page[type="clip"]')
-                ->map( attr => 'id' )->each )
-            {
-                $ua->get( "https://taz.de/!p$clip_id/c-l.xml" => $delay->begin );
-                $ua->get( "https://taz.de/!p$clip_id/c.xml"   => $delay->begin );
-            }
-        },
-        sub {
-            my ( $delay, $geno, @responses ) = @_;
-
-            my $members_count =
-              $geno->result->dom->at('item[role="members-count"] corpus')->text;
-
-            my @lists;
-            while (@responses) {
-                my ( $l_xml, $c_xml ) = splice( @responses, 0, 2 );
-                my $length = $l_xml->result->dom->find('linklist[type="self"]')
-                  ->map( attr => 'length' )->reduce( sub { $a + $b } );
-
-                push @lists,
-                  Taz::List->new(
-                    tree   => $c_xml->result->dom,
-                    length => $length
-                  );
-            }
-
-            for my $list (@lists) {
-                my @items =
-                  grep { !$articles_used{ $_->id } } @{ $list->items };
-                splice( @items, $list->length );
-                for my $item (@items) {
-                    $articles_used{ $item->id }++;
-                }
-                $list->items( \@items );
-            }
-
-            render(
-                'startseite.txt',
-                {
-                    lists         => \@lists,
-                    host          => $host,
-                    port          => $port,
-                    members_count => $members_count
-                }
-            );
-        }
-    )->wait;
+    render_startpage->wait;
 }
 elsif ( $selector =~ /(![0-9]+)/ ) {
-    my $dom = $ua->get("https://taz.de/$1/c.xml")->res->dom;
+    my $dom  = $ua->get("https://taz.de/$1/c.xml")->res->dom;
     my $item = Taz::Article->new( tree => $dom );
     render(
         'artikel.txt',
@@ -141,7 +140,7 @@ elsif ( $selector =~ /(![0-9]+)/ ) {
     );
 }
 elsif ( $selector =~ /(![tap][0-9]+)/ ) {
-    my $dom = $ua->get("https://taz.de/$1/c.xml")->res->dom;
+    my $dom  = $ua->get("https://taz.de/$1/c.xml")->res->dom;
     my $list = Taz::List->new( tree => $dom );
     render(
         'liste.txt',
@@ -178,10 +177,10 @@ sub unidecode {
     $text =~ s/$uc_qr(?=[[:upper:]])/uc $uppercase_umlauts{$1}/ge;
 
     my %decode_chars = (
-        'ä'  => 'ae',
-        'ö'  => 'oe',
-        'ü'  => 'ue',
-        'ß'  => 'ss',
+        'ä' => 'ae',
+        'ö' => 'oe',
+        'ü' => 'ue',
+        'ß' => 'ss',
         '“' => '"',
         '„' => '"',
         %uppercase_umlauts
