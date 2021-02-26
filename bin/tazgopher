@@ -47,7 +47,11 @@ $selector =~ s/\r?\n//;
 my $query;
 ( $selector, $query ) = split( "\t", $selector, 2 );
 
-my $url = Mojo::URL->new( $selector || '/' );
+if ( $selector && $selector =~ /^wrap=\d+/ ) {
+    $selector = '/1/?' . $selector;
+}
+
+my $url = Mojo::URL->new( $selector || '/1/' );
 
 $selector = $url->path;
 my $wrap = $url->query->param('wrap');
