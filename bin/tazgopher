@@ -1,9 +1,11 @@
 #!/usr/bin/perl
 
-use Mojo::Base -strict, -async_await;
+use strict;
 use warnings;
 use FindBin '$Bin';
-use lib "$Bin/../lib", "$Bin/../extlib";
+use lib "$Bin/../lib", "$Bin/../extlib/lib/perl5";
+
+use Mojo::Base -async_await;
 
 use utf8;
 use Text::Wrap qw();
